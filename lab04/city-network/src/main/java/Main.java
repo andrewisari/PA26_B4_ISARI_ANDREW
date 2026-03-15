@@ -7,6 +7,7 @@ public class Main {
         demonstrateSortedStreets(handcraftedCity);
         demonstrateSetDeduplication(handcraftedCity);
         demonstrateStreetQuery(handcraftedCity, 500.0, 3);
+        demonstrateKBestSpanningTrees(handcraftedCity, 5);
 
         System.out.println("\n========================================");
 
@@ -73,5 +74,16 @@ public class Main {
         List<Street> result = city.getStreetsLongerThanWithMinDegree(minLength, minDegree);
         System.out.println("\nMatching streets (" + result.size() + "):");
         result.forEach(System.out::println);
+    }
+
+    private static void demonstrateKBestSpanningTrees(City city, int k) {
+        System.out.println("\n=== Top " + k + " minimum spanning trees by cable installation cost ===");
+        CityNetworkSolver solver = new CityNetworkSolver(city);
+        List<SpanningTreeSolution> solutions = solver.findKBestSpanningTrees(k);
+
+        for (int i = 0; i < solutions.size(); i++) {
+            System.out.println("\nRank #" + (i + 1));
+            System.out.println(solutions.get(i));
+        }
     }
 }
