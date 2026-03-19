@@ -1,20 +1,24 @@
 package models;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
+import models.errors.features.DuplicateException;
+import models.errors.features.NotFoundException;
+import models.errors.systems.AccessException;
+import models.errors.systems.ReportException;
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader;
 
 import java.awt.*;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.StringWriter;
+import java.io.*;
+import java.lang.reflect.Type;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashSet;
@@ -29,36 +33,64 @@ public class RepositoryControl {
     @EqualsAndHashCode.Include
     private Set<BibliographicReferences> referenceList = new HashSet<>();
 
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Type REF_SET_TYPE = new TypeToken<HashSet<BibliographicReferences>>() {}.getType();
+
+    public void loadFromFile(String filePath) {
+        File file = new File(filePath);
+        if (!file.exists()) {
+            System.out.println("[INFO] No catalog file found at: " + filePath + " -- starting with empty catalog.");
+            return;
+        }
+
+        try (Reader reader = new FileReader(file)) {
+            Set<BibliographicReferences> loaded = GSON.fromJson(reader, REF_SET_TYPE);
+            if (loaded != null) {
+                referenceList.addAll(loaded);
+            }
+            System.out.println("[INFO] Loaded " + referenceList.size() + " reference(s) from: " + filePath);
+        } catch (IOException e) {
+            throw new ReportException("Failed to read catalog from JSON file: " + filePath, e);
+        }
+    }
+
+    public void saveToFile(String filePath) {
+        try (Writer writer = new FileWriter(filePath)) {
+            GSON.toJson(referenceList, writer);
+            System.out.println("[INFO] Saved " + referenceList.size() + " reference(s) to: " + filePath);
+        } catch (IOException e) {
+            throw new ReportException("Failed to write catalog to JSON file: " + filePath, e);
+        }
+    }
+
     public void addRef(BibliographicReferences newReference) {
-        if (!referenceList.add(newReference)) throw new RuntimeException("[ERROR] Could not add this reference. Please try again. [ERROR]");
+        if (!referenceList.add(newReference)) {
+            throw new DuplicateException(newReference.getId());
+        }
     }
 
     public void removeRef(BibliographicReferences referenceToRemove) {
-        if (!referenceList.contains(referenceToRemove)) throw new RuntimeException("[ERROR] Reference you want to remove does not exist. [ERROR]");
-        if (!referenceList.remove(referenceToRemove)) throw new RuntimeException("[ERROR] Could not remove this reference. Please try again. [ERROR]");
+        if (!referenceList.remove(referenceToRemove)) {
+            throw new NotFoundException(referenceToRemove.getId());
+        }
     }
 
     public void updateAll(BibliographicReferences targetReference, BibliographicReferences updateReference) {
-        if (!referenceList.contains(targetReference)) throw new RuntimeException("[ERROR] Target reference does not exist. [ERROR]");
         removeRef(targetReference);
         addRef(updateReference);
     }
 
     public void load(BibliographicReferences targetReference) {
-        for (BibliographicReferences ref : referenceList) {
-            if (ref.equals(targetReference)) {
-                System.out.println("=== Reference Details ===");
-                System.out.println("ID:       " + ref.getId());
-                System.out.println("Title:    " + ref.getTitle());
-                System.out.println("Author:   " + ref.getAuthor());
-                System.out.println("Year:     " + ref.getYear());
-                System.out.println("Type:     " + ref.getType());
-                System.out.println("Location: " + ref.getLocation());
-                System.out.println("=========================");
-                return;
-            }
-        }
-        throw new RuntimeException("[ERROR] Reference not found in catalog. [ERROR]");
+        BibliographicReferences ref = findOrThrow(targetReference);
+
+        System.out.println("=== Reference Details ===");
+        System.out.println("ID:       " + ref.getId());
+        System.out.println("Title:    " + ref.getTitle());
+        System.out.println("Author:   " + ref.getAuthor());
+        System.out.println("Year:     " + ref.getYear());
+        System.out.println("Type:     " + ref.getType());
+        System.out.println("Location: " + ref.getLocation());
+        System.out.println("=========================\n\n");
     }
 
     public void list() {
@@ -70,13 +102,8 @@ public class RepositoryControl {
     }
 
     public void view(BibliographicReferences targetReference) {
-        for (BibliographicReferences ref : referenceList) {
-            if (ref.equals(targetReference)) {
-                openLocation(ref.getLocation());
-                return;
-            }
-        }
-        throw new RuntimeException("[ERROR] Reference not found in catalog. [ERROR]");
+        BibliographicReferences ref = findOrThrow(targetReference);
+        openLocation(ref.getLocation());
     }
 
     public void report() {
@@ -101,12 +128,21 @@ public class RepositoryControl {
             }
             openLocation(reportFile.getAbsolutePath());
         } catch (IOException e) {
-            throw new RuntimeException("[ERROR] Could not create or open the report file. [ERROR]", e);
+            throw new ReportException("Failed to create or write the HTML report file.", e);
         }
     }
 
+    private BibliographicReferences findOrThrow(BibliographicReferences target) {
+        return referenceList.stream()
+                .filter(ref -> ref.equals(target))
+                .findFirst()
+                .orElseThrow(() -> new NotFoundException(target.getId()));
+    }
+
     private void openLocation(String location) {
-        if (!Desktop.isDesktopSupported()) throw new RuntimeException("[ERROR] Desktop is not supported on this system. [ERROR]");
+        if (!Desktop.isDesktopSupported()) {
+            throw new AccessException(location, "Desktop API is not supported on this system");
+        }
 
         Desktop desktop = Desktop.getDesktop();
 
@@ -117,7 +153,7 @@ public class RepositoryControl {
                 desktop.open(new File(location));
             }
         } catch (IOException | URISyntaxException e) {
-            throw new RuntimeException("[ERROR] Could not open target location. [ERROR]", e);
+            throw new AccessException(location, e);
         }
     }
 }

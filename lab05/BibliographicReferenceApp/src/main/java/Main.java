@@ -2,33 +2,48 @@ import enums.ResourceType;
 import models.BibliographicReferences;
 import models.CommandOperationExecutor;
 import models.RepositoryControl;
-import models.commands.AddCommand;
-import models.commands.ListCommand;
-import models.commands.LoadCommand;
-import models.commands.ReportCommand;
-import models.commands.ViewCommand;
+import models.commands.*;
 
 public class Main {
+
+    private static final String CATALOG_FILE = "catalog.json";
+
     public static void main(String[] args) {
         RepositoryControl catalog = new RepositoryControl();
         CommandOperationExecutor executor = new CommandOperationExecutor();
 
-        BibliographicReferences knuth = new BibliographicReferences("knuth67", "The Art of Computer Programming",
-                "d:/books/programming/tacp.ps", 1967, "Donald E. Knuth", ResourceType.Book);
+        catalog.loadFromFile(CATALOG_FILE);
 
-        BibliographicReferences jvm = new BibliographicReferences("jvm25", "The Java Virtual Machine Specification",
-                "https://docs.oracle.com/javase/specs/jvms/se25/html/index.html", 2025, "Tim Lindholm & others", ResourceType.Article);
+        if (catalog.getReferenceList().isEmpty()) {
+            BibliographicReferences knuth = new BibliographicReferences("knuth67",
+                    "The Art of Computer Programming",
+                    "d:/books/programming/tacp.ps", 1967,
+                    "Donald E. Knuth", ResourceType.Book);
 
-        BibliographicReferences jls = new BibliographicReferences("java25", "The Java Language Specification",
-                "https://docs.oracle.com/javase/specs/jls/se25/jls25.pdf", 2025, "James Gosling & others", ResourceType.Article);
+            BibliographicReferences jvm = new BibliographicReferences("jvm25",
+                    "The Java Virtual Machine Specification",
+                    "https://docs.oracle.com/javase/specs/jvms/se25/html/index.html", 2025,
+                    "Tim Lindholm & others", ResourceType.Article);
 
-        executor.executeOpration(new AddCommand(catalog, knuth));
-        executor.executeOpration(new AddCommand(catalog, jvm));
-        executor.executeOpration(new AddCommand(catalog, jls));
+            BibliographicReferences jls = new BibliographicReferences("java25",
+                    "The Java Language Specification",
+                    "https://docs.oracle.com/javase/specs/jls/se25/jls25.pdf", 2025,
+                    "James Gosling & others", ResourceType.Article);
 
-        executor.executeOpration(new ListCommand(catalog));
-        executor.executeOpration(new LoadCommand(catalog, jvm));
-        executor.executeOpration(new ViewCommand(catalog, jls));
-        executor.executeOpration(new ReportCommand(catalog));
+            executor.executeOperation(new AddCommand(catalog, knuth));
+            executor.executeOperation(new AddCommand(catalog, jvm));
+            executor.executeOperation(new AddCommand(catalog, jls));
+        }
+
+        executor.executeOperation(new ListCommand(catalog));
+
+        BibliographicReferences jvmLookup = new BibliographicReferences("jvm25", null, null, 0, null, null);
+        BibliographicReferences jlsLookup = new BibliographicReferences("java25", null, null, 0, null, null);
+
+        executor.executeOperation(new LoadCommand(catalog, jvmLookup));
+        executor.executeOperation(new ViewCommand(catalog, jlsLookup));
+        executor.executeOperation(new ReportCommand(catalog));
+
+        executor.executeOperation(new SaveCommand(catalog, CATALOG_FILE));
     }
 }

@@ -1,5 +1,10 @@
 package enums;
 
 public enum ResourceType {
-    Book, Article, ResearchPaper
+    Book,
+    Article,
+    Thesis,
+    Report,
+    Website,
+    Other
 }

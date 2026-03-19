@@ -31,6 +31,6 @@ public class BibliographicReferences {
 
     @Override
     public String toString() {
-        return String.format("{\"id\":\"%s\", \"title\":\"%s\", \"location\":\"%s\", \"year\":\"%d\", \"author\":\"%s\"}", id, title, location, year, author);
+        return String.format("{\"id\":\"%s\", \"title\":\"%s\", \"location\":\"%s\", \"year\":%d, \"author\":\"%s\", \"type\":\"%s\"}", id, title, location, year, author, type);
     }
 }
