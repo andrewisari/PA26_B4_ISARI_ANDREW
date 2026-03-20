@@ -54,7 +54,7 @@ public class RepositoryControl {
         }
     }
 
-    public void saveToFile(String filePath) {
+    public void save(String filePath) {
         try (Writer writer = new FileWriter(filePath)) {
             GSON.toJson(referenceList, writer);
             System.out.println("[INFO] Saved " + referenceList.size() + " reference(s) to: " + filePath);
