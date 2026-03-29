@@ -1,5 +1,6 @@
 package models;
 
+import algorithms.SetCoverSolver;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -90,6 +91,7 @@ public class RepositoryControl {
         System.out.println("Year:     " + ref.getYear());
         System.out.println("Type:     " + ref.getType());
         System.out.println("Location: " + ref.getLocation());
+        System.out.println("Concepts: " + ref.getConcepts());
         System.out.println("=========================\n\n");
     }
 
@@ -104,6 +106,12 @@ public class RepositoryControl {
     public void view(BibliographicReferences targetReference) {
         BibliographicReferences ref = findOrThrow(targetReference);
         openLocation(ref.getLocation());
+    }
+
+    public SetCoverSolver.CoverResult cover() {
+        Set<String> universe = ConceptRegistry.getAll();
+        SetCoverSolver.CoverResult result = SetCoverSolver.greedy(referenceList, universe);
+        return result;
     }
 
     public void report() {
