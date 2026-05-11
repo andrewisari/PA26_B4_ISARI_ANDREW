@@ -1,6 +1,7 @@
 package org.example.server;
 
 import lombok.extern.java.Log;
+import org.example.server.persistence.GameRecorder;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -15,13 +16,17 @@ public class Matchmaker implements Runnable {
     private final QuestionBank bank;
     private final int questionsPerGame;
     private final long timePerQuestionMs;
+    private final GameRecorder recorder;
     private volatile boolean running = true;
 
-    public Matchmaker(ExecutorService executor, QuestionBank bank, int questionsPerGame, long timePerQuestionMs) {
+    public Matchmaker(ExecutorService executor, QuestionBank bank,
+                      int questionsPerGame, long timePerQuestionMs,
+                      GameRecorder recorder) {
         this.executor = executor;
         this.bank = bank;
         this.questionsPerGame = questionsPerGame;
         this.timePerQuestionMs = timePerQuestionMs;
+        this.recorder = recorder;
     }
 
     public void enqueue(Player player) {
@@ -43,7 +48,7 @@ public class Matchmaker implements Runnable {
                 }
                 log.info("Pairing '" + p1.getName() + "' vs '" + p2.getName() + "'");
                 GameSession session = new GameSession(
-                        p1, p2, bank.sample(questionsPerGame), timePerQuestionMs, executor);
+                        p1, p2, bank.sample(questionsPerGame), timePerQuestionMs, executor, recorder);
                 executor.submit(session);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

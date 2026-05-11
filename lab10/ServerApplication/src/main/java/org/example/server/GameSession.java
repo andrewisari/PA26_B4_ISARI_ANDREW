@@ -1,7 +1,9 @@
 package org.example.server;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.java.Log;
+import org.example.server.persistence.GameRecorder;
+import org.example.server.persistence.entity.GameEntity;
+import org.example.server.persistence.entity.PlayerEntity;
 
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -12,7 +14,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 @Log
-@RequiredArgsConstructor
 public class GameSession implements Runnable {
 
     private final Player p1;
@@ -20,10 +21,32 @@ public class GameSession implements Runnable {
     private final List<Question> questions;
     private final long timePerQuestionMs;
     private final ExecutorService executor;
+    private final GameRecorder recorder;
+
+    private PlayerEntity p1Entity;
+    private PlayerEntity p2Entity;
+    private GameEntity   gameEntity;
+
+    public GameSession(Player p1, Player p2, List<Question> questions,
+                       long timePerQuestionMs, ExecutorService executor,
+                       GameRecorder recorder) {
+        this.p1 = p1;
+        this.p2 = p2;
+        this.questions = questions;
+        this.timePerQuestionMs = timePerQuestionMs;
+        this.executor = executor;
+        this.recorder = recorder;
+    }
+
+    public GameSession(Player p1, Player p2, List<Question> questions,
+                       long timePerQuestionMs, ExecutorService executor) {
+        this(p1, p2, questions, timePerQuestionMs, executor, null);
+    }
 
     @Override
     public void run() {
         try {
+            recordGameStart();
             announceStart();
             for (int i = 0; i < questions.size(); i++) {
                 Question q = questions.get(i);
@@ -44,10 +67,12 @@ public class GameSession implements Runnable {
 
                 if (!p1.isConnected() || !p2.isConnected()) {
                     handleEarlyExit();
+                    recordGameEnd(true);
                     return;
                 }
             }
             announceEnd();
+            recordGameEnd(false);
         } catch (Exception e) {
             log.warning("Session error: " + e.getMessage());
         } finally {
@@ -55,6 +80,36 @@ public class GameSession implements Runnable {
             p2.close();
             log.info("Session ended: " + p1.getName() + " vs " + p2.getName());
         }
+    }
+
+    private void recordGameStart() {
+        if (recorder == null) return;
+        p1Entity = recorder.registerPlayer(p1.getName());
+        p2Entity = recorder.registerPlayer(p2.getName());
+        gameEntity = recorder.startGame(p1Entity, p2Entity, questions.size());
+    }
+
+    private void recordGameEnd(boolean earlyExit) {
+        if (recorder == null || gameEntity == null) return;
+        GameEntity.Outcome outcome;
+        if (earlyExit) {
+            boolean p1Out = !p1.isConnected();
+            boolean p2Out = !p2.isConnected();
+            if (p1Out && p2Out)      outcome = GameEntity.Outcome.BOTH_ABANDONED;
+            else if (p1Out)          outcome = GameEntity.Outcome.P1_ABANDONED;
+            else                     outcome = GameEntity.Outcome.P2_ABANDONED;
+        } else {
+            if (p1.getCorrectCount() > p2.getCorrectCount())      outcome = GameEntity.Outcome.P1_WIN;
+            else if (p1.getCorrectCount() < p2.getCorrectCount()) outcome = GameEntity.Outcome.P2_WIN;
+            else if (p1.getCorrectResponseMs() < p2.getCorrectResponseMs()) outcome = GameEntity.Outcome.P1_WIN;
+            else if (p1.getCorrectResponseMs() > p2.getCorrectResponseMs()) outcome = GameEntity.Outcome.P2_WIN;
+            else                                                  outcome = GameEntity.Outcome.DRAW;
+        }
+        recorder.recordResult(
+                gameEntity,
+                p1Entity, p1.getCorrectCount(), p1.getCorrectResponseMs(),
+                p2Entity, p2.getCorrectCount(), p2.getCorrectResponseMs(),
+                outcome);
     }
 
     private void announceStart() {

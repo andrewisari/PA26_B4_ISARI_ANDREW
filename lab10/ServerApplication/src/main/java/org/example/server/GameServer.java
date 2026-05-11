@@ -1,6 +1,10 @@
 package org.example.server;
 
 import lombok.extern.java.Log;
+import org.example.server.persistence.GameRecorder;
+import org.example.server.persistence.PersistenceManager;
+import org.example.server.persistence.QuestionLoader;
+import org.example.server.persistence.repository.QuestionRepository;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -31,6 +35,7 @@ public class GameServer {
     private ExecutorService executor;
     private Matchmaker      matchmaker;
     private QuestionBank    bank;
+    private GameRecorder    recorder;
     private volatile boolean running;
 
     public GameServer(int port, int poolSize, int questionsPerGame, long timePerQuestionMs) {
@@ -52,10 +57,20 @@ public class GameServer {
             return;
         }
 
+        try {
+            PersistenceManager.init(PersistenceManager.DEFAULT_PU);
+            QuestionLoader.seedFromClasspath(QUESTIONS_RESOURCE, new QuestionRepository());
+            recorder = new GameRecorder();
+            log.info("Persistence layer initialized");
+        } catch (Exception e) {
+            log.warning("Persistence layer failed to initialize; game state will not be persisted: " + e.getMessage());
+            recorder = null;
+        }
+
         executor = (poolSize <= 0)
                 ? Executors.newVirtualThreadPerTaskExecutor()
                 : Executors.newFixedThreadPool(poolSize);
-        matchmaker = new Matchmaker(executor, bank, questionsPerGame, timePerQuestionMs);
+        matchmaker = new Matchmaker(executor, bank, questionsPerGame, timePerQuestionMs, recorder);
         executor.submit(matchmaker);
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "server-shutdown-hook"));
@@ -137,6 +152,7 @@ public class GameServer {
                 Thread.currentThread().interrupt();
             }
         }
+        PersistenceManager.close();
         log.info("GameServer shutdown complete");
     }
 
