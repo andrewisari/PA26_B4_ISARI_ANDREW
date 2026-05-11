@@ -51,7 +51,10 @@ public class SpeedController {
     public void pauseAll()  { entities.values().forEach(s -> s.paused = true); }
     public void resumeAll() { entities.values().forEach(s -> s.paused = false); }
     public void fasterAll() { entities.values().forEach(s -> s.delayMs = clamp(s.delayMs / 2)); }
-    public void slowerAll() { entities.values().forEach(s -> s.delayMs = clamp(Math.max(s.delayMs * 2, s.delayMs + 50))); }
+    public void slowerAll()
+    {
+        entities.values().forEach(state -> state.delayMs = clamp(Math.max(state.delayMs * 2, state.delayMs + 50)));
+    }
 
     private boolean apply(String name, java.util.function.Consumer<State> action) {
         State s = entities.get(name);

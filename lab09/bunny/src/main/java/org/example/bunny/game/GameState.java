@@ -18,9 +18,12 @@ public class GameState {
         private final String message;
     }
 
-    @Getter private volatile Outcome outcome = Outcome.ONGOING;
-    @Getter private volatile String winnerName;
-    @Getter private volatile Cell endingCell;
+    @Getter
+    private volatile Outcome outcome = Outcome.ONGOING;
+    @Getter
+    private volatile String winnerName;
+    @Getter
+    private volatile Cell endingCell;
 
     public boolean isOver() {
         return outcome != Outcome.ONGOING;
