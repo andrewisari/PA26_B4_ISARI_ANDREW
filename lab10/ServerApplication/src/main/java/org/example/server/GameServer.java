@@ -52,7 +52,9 @@ public class GameServer {
             return;
         }
 
-        executor = Executors.newFixedThreadPool(poolSize);
+        executor = (poolSize <= 0)
+                ? Executors.newVirtualThreadPerTaskExecutor()
+                : Executors.newFixedThreadPool(poolSize);
         matchmaker = new Matchmaker(executor, bank, questionsPerGame, timePerQuestionMs);
         executor.submit(matchmaker);
 
@@ -65,8 +67,9 @@ public class GameServer {
         try {
             serverSocket = new ServerSocket(port);
             running = true;
+            String poolDesc = (poolSize <= 0) ? "virtual-thread-per-task" : ("fixed=" + poolSize);
             log.info("GameServer listening on port " + port
-                    + " | pool=" + poolSize
+                    + " | executor=" + poolDesc
                     + " | questions=" + questionsPerGame
                     + " | timePerQuestion=" + timePerQuestionMs + " ms"
                     + " | type 'stop' to shut down");
