@@ -7,13 +7,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Log
 public class GameClient {
 
     private static final String DEFAULT_HOST = "localhost";
-    private static final int DEFAULT_PORT = 5000;
-    private static final String EXIT_COMMAND = "exit";
+    private static final int    DEFAULT_PORT = 5000;
 
     private final String host;
     private final int port;
@@ -31,21 +31,15 @@ public class GameClient {
 
             log.info("Connected to " + host + ":" + port);
 
-            String line;
-            while (true) {
-                System.out.print("> ");
-                line = keyboard.readLine();
-                if (line == null || EXIT_COMMAND.equalsIgnoreCase(line)) {
-                    break;
-                }
-                serverOut.println(line);
-                String response = serverIn.readLine();
-                if (response == null) {
-                    log.info("Server closed the connection");
-                    break;
-                }
-                System.out.println(response);
-            }
+            AtomicBoolean running = new AtomicBoolean(true);
+
+            Thread listener = new Thread(new ServerListener(serverIn, running), "server-listener");
+            listener.setDaemon(true);
+            listener.start();
+
+            new KeyboardSender(keyboard, serverOut, running).run();
+
+            try { listener.join(500); } catch (InterruptedException ignored) {}
         } catch (IOException e) {
             log.severe("Client error: " + e.getMessage());
         }
@@ -53,7 +47,7 @@ public class GameClient {
 
     public static void main(String[] args) {
         String host = args.length > 0 ? args[0] : DEFAULT_HOST;
-        int port = args.length > 1 ? Integer.parseInt(args[1]) : DEFAULT_PORT;
+        int    port = args.length > 1 ? Integer.parseInt(args[1]) : DEFAULT_PORT;
         new GameClient(host, port).run();
     }
 }
